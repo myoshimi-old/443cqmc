@@ -4,6 +4,24 @@
 #include"hamming.h"
 #include"unit.h"
 
+int unitBitcount(UINT8* d, int cnum){
+  int i;
+  int b, n, s;
+  
+  b = (int)ceil((REAL)cnum / (sizeof(UINT8)*8));
+
+  s = 0;
+  for(i=b-1;i>=0;i--){
+    n = d[i];
+    n = (UINT8)( ((n & 0xAA) >> 1) + (n & 0x55) );
+    n = (UINT8)( ((n & 0xCC) >> 2) + (n & 0x33) );
+    n = (UINT8)( ((n & 0xF0) >> 4) + (n & 0x0F) );
+    s += n;
+  }
+  return n;
+}
+
+
 void unitSet(unit* u, int aidx, int d){
   int a, m;
   a = d / (sizeof(UINT8)*8);

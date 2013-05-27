@@ -16,6 +16,7 @@ UINT32 udata2uint(UINT8* a, int n);
 void uintSort(UINT8** array, int num, int cnum);
 void uintCpy(UINT8* d, UINT8* s, int cnum);
 unit* unitClone(unit* uin, int cnum);
+int unitBitcount(UINT8* d, int cnum);
 
 #endif
 

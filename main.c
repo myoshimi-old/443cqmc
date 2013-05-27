@@ -4,6 +4,7 @@
 
 #include"443qmc.h"
 #include"unit.h"
+#include"unit32.h"
 #include"hamming.h"
 
 void qm(int num_true, UINT32* minterm_true,
@@ -12,6 +13,9 @@ void qm(int num_true, UINT32* minterm_true,
   int num_minterm, max_value=0;
   UINT32* minterm;
   int blength=0;
+  int un;
+  unit32 **ua;
+  int idx;
   int bc;
   int cycle;
   hamming **hp, **hp2;
@@ -93,7 +97,7 @@ void qm(int num_true, UINT32* minterm_true,
           if(j==0) printf(" %d(", lp->flag);
           printf("%d", lp->array[j]);
           if(j != lp->arraysize-1) printf(",");
-          else printf(")\n");
+          else printf(")");
         }
         
         if(lp->flag == 0){
@@ -105,13 +109,21 @@ void qm(int num_true, UINT32* minterm_true,
           rp->next = primes->head;
           primes->head = rp;
           primes->len++;
+          printf(" Add primes");
         }
+        printf("\n");
         lp = lp->next;
       }
     }
     // Primes
     printf("*** Primes ***\n");
-    hammingView(primes, minterm);
+    //hammingView(primes, minterm);
+    lp = primes->head;
+    while(lp != NULL){
+      bitExpression(minterm, lp, blength);
+      printf("\n");
+      lp = lp->next;
+    }
     printf("------------------------------------------------------------\n");
 
     // hpを開放する
@@ -205,7 +217,6 @@ void qm(int num_true, UINT32* minterm_true,
   // tableはもう使わないのでfreeする
   for(i=0;i<pnum;i++) free(table[i]);
   free(table);
-
   
   uu = unitClone(u[0], pnum);
   for(i=1;i<num_true;i++){
@@ -230,26 +241,44 @@ void qm(int num_true, UINT32* minterm_true,
     free(u[i]);
   }
   free(u);
-  
+
+  ua = (unit32**)malloc(sizeof(unit32*)*uu->num);
   for(i=0;i<uu->num;i++){
-    m = 0;
+    un = unitBitcount(uu->array[i], pnum);
+    ua[i] = (unit32*)malloc(sizeof(unit32)*uu->num);
+    ua[i]->num = un;
+    ua[i]->array = (UINT32*)malloc(sizeof(UINT32)*ua[i]->num);
+    
+    m=0; idx=0;
     for(j=0;j<b;j++){
-      tp = uu->array[i][j];
-      
+      tp=uu->array[i][j];
       for(k=0;k<8;k++){
-        if(tp%2==1) printf("%d ", m);
-        tp = tp / 2;
+        if(tp%2==1){
+          ua[i]->array[idx] = (UINT32)m;
+          idx++;
+        }
+        tp/=2;
         m++;
       }
-      printf("\n");
     }
   }
+  
+  for(i=0;i<uu->num;i++){
+    printf("[%d](%d) ", i, ua[i]->num);
+    for(j=0;j<ua[i]->num;j++)
+      printf("%d ", ua[i]->array[j]);
+    printf("\n");
+  }
 
-
+  for(i=0;i<uu->num;i++){
+    for(j=0;j<ua[i]->num;j++){
+      bitExpression(minterm, primearray[ua[i]->array[j]], blength);
+      printf(" ");
+    }
+    printf("\n");
+  }
+  
 }
-
-
-
 
 
 

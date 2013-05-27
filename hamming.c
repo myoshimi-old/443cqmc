@@ -68,6 +68,28 @@ void hammingAppend(hamming* hin, int flag, UINT32 mask){
   hin->head = h;
 }
 
+void bitExpression(UINT32* term, hammingData* hd, int blen){
+  int i;
+  UINT32 d;
+  UINT32 m;
+  char c[8];
+  
+  d = term[hd->array[0]];
+  m = hd->mask;
+
+  for(i=0;i<blen;i++){
+    if(m % 2) c[i] = 'X';
+    else      c[i] = '0'+d%2;
+    m /= 2;
+    d /= 2;
+  }
+  
+  for(i=blen-1;i>=0;i--){
+    printf("%c", c[i]);
+  }
+
+
+}
 
 void hammingMatch(hamming* h, hammingData *a, hammingData *b, UINT32 *term){
   int i;

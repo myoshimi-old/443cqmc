@@ -23,5 +23,7 @@ void hammingMatch(hamming* h, hammingData *a, hammingData *b, UINT32 *term);
 int bitcount(UINT32 n);
 int hammingDistance(UINT32 a, UINT32 b, UINT32 ma, UINT32 mb);
 void hammingFree(hamming* h);
+void bitExpression(UINT32* term, hammingData* hd, int blen);
+
 
 #endif
