@@ -6,7 +6,7 @@
 
 int unitBitcount(UINT8* d, int cnum){
   int i;
-  int b, n, s;
+  int b, s, n;
   
   b = (int)ceil((REAL)cnum / (sizeof(UINT8)*8));
 
@@ -18,9 +18,8 @@ int unitBitcount(UINT8* d, int cnum){
     n = (UINT8)( ((n & 0xF0) >> 4) + (n & 0x0F) );
     s += n;
   }
-  return n;
+  return s;
 }
-
 
 void unitSet(unit* u, int aidx, int d){
   int a, m;
@@ -62,6 +61,13 @@ unit* unitClone(unit* uin, int cnum){
   return ret;
 }
 
+void unitFree(unit* u){
+  int i;
+  for(i=0;i<u->num;i++) free(u->array[i]);
+  free(u->array);
+  free(u);
+}
+
 unit* unitMerge(unit* u1, unit* u2, int n){
   unit* ret;
   int i, j, k;
@@ -91,14 +97,16 @@ unit* unitMerge(unit* u1, unit* u2, int n){
   }
   
   // ソート
-  uintSort(array, num, n);
+  printf("S:%d b:%d ", num, b);
+  uintSort(array, num, b);
 
   // 重複の削除＋返り値への代入
   nn = 1;
   for(i=0;i<num-1;i++){
-    if(uintCmp(array[i], array[i+1], num) != EQ) nn++;
+    if(uintCmp(array[i], array[i+1], b) != EQ) nn++;
   }
-  printf("nn : %d\n", nn);
+  
+  printf(" n:%d\n", nn);
 
   ret = (unit*)malloc(sizeof(unit));
   ret->num = nn;
@@ -110,35 +118,39 @@ unit* unitMerge(unit* u1, unit* u2, int n){
   }
 
   k=0;
-  uintCpy(ret->array[k], array[0], num);
+  uintCpy(ret->array[k], array[0], b);
   k++;
   for(i=1;i<num;i++){
-    if(uintCmp(array[i-1], array[i], num) != EQ){
-      uintCpy(ret->array[k], array[i], num);
+    if(uintCmp(array[i-1], array[i], b) != EQ){
+      uintCpy(ret->array[k], array[i], b);
       k++;
     }
   }
-
-  /*
-  ret = (unit*)malloc(sizeof(unit));
-  ret->num = num;
-  ret->array = array;
-  */
+  
   return ret;
 }
 
-int uintCmp(UINT8* a1, UINT8* a2, int num){
-  int i, b;
+int uintCmp(UINT8* a1, UINT8* a2, int b){
+  int i;
   int t=0;
   int ret=0;
   
-  b = (int)ceil((REAL)num / (sizeof(UINT8)*8));
-  
-  t=0; i=b-1;
+  t=0; i=b;
   while((t == 0) & (i>=0)){
     t = (int)(a1[i] - a2[i]);
     i--;
   };
+  /*
+  printf("t %d\n", t);
+  for(i=b-1;i>=0;i--){
+    printf("%X", a1[i]);
+  }
+  printf("\n");
+  for(i=b-1;i>=0;i--){
+    printf("%X", a2[i]);
+  }
+  printf("\n");
+  */
   if(t<0) ret = LT;
   else if(t>0) ret = GT;
   else ret = EQ;
@@ -146,26 +158,67 @@ int uintCmp(UINT8* a1, UINT8* a2, int num){
   return ret;
 }
 
-void uintSort(UINT8** array, int num, int cnum){
-  int i, j, b;
+UINT8* uintMed3(UINT8* x, UINT8* y, UINT8* z, int b){
+  UINT8* ret;
+  if(uintCmp(x, y, b) == LT){
+    // x < y
+    if(uintCmp(y, z, b) == LT)      ret = y;
+    else if(uintCmp(z, x, b) == LT) ret = x;
+    else                            ret = z;
+  }
+  else{
+    // y < x
+    if(uintCmp(z, y, b) == LT)      ret = z;
+    else if(uintCmp(x, z, b) == LT) ret = x;
+    else                            ret = y;
+  }
+  return ret;
+}
+
+void uintQuicksort(UINT8** a, int left, int right, int b){
+  int i, j;
+  UINT8 *tmp, *pivot;
+  if(left < right){
+    i = left; j = right;
+    pivot = uintMed3(a[i], a[i+(j-i)/2], a[j], b);
+    while(1){
+      while(uintCmp(a[i], pivot, b) == LT) i++;
+      while(uintCmp(pivot, a[j], b) == LT) j--;
+      if(i>=j) break;
+      tmp = a[i];
+      a[i] = a[j];
+      a[j] = tmp;
+      i++; j--;
+    }
+
+    //if(right - left > 100000)
+    //printf("sort %d %d\n", left, right);
+    
+    uintQuicksort(a, left,  i-1, b);
+    uintQuicksort(a, j+1, right, b);
+  }
+}
+
+void uintSort(UINT8** array, int num, int b){
+  /*
+    int i, j;
   UINT8* t;
-  
-  b = (int)ceil((REAL)cnum / (sizeof(UINT8)*8));
-  
   for(i=0;i<num;i++){
     for(j=i+1;j<num;j++){
-      if(uintCmp(array[i], array[j], num) == GT){
+      if(uintCmp(array[i], array[j], b) == GT){
         t = array[i];
         array[i] = array[j];
         array[j] = t;
       }
     }
   }
+  */
+
+  uintQuicksort(array, 0, num-1, b);
 }
 
-void uintCpy(UINT8* d, UINT8* s, int cnum){
-  int i, b;
-  b = (int)ceil((REAL)cnum / (sizeof(UINT8)*8));
+void uintCpy(UINT8* d, UINT8* s, int b){
+  int i;
   for(i=b-1;i>=0;i--) d[i] = s[i];
 }
 

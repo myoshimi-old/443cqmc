@@ -1,4 +1,5 @@
 #include<stdio.h>
+#include<unistd.h>
 #include<stdlib.h>
 #include<math.h>
 
@@ -6,6 +7,15 @@
 #include"unit.h"
 #include"unit32.h"
 #include"hamming.h"
+
+#include <sys/time.h>
+
+double gettimeofday_sec(){
+  struct timeval t;
+  gettimeofday(&t, NULL);
+  return (double)t.tv_sec + (double)t.tv_usec * 1e-6;
+}
+
 
 void qm(int num_true, UINT32* minterm_true,
         int num_dc,   UINT32* minterm_dc){
@@ -26,10 +36,16 @@ void qm(int num_true, UINT32* minterm_true,
   int num;
   //UINT8** unit;
   UINT8** table;
+  UINT8* a;
+  UINT8* p;
+  
   unit**  u;
   unit *uu, *uu2;
   int b;
-  UINT8 tp;
+  double t1, t2;
+
+  int* cnum;
+  int maxidx, maxnum;
 
   printf("======================== Computing =========================\n");
   printf("# of 1  : %d\n", num_true);
@@ -171,125 +187,129 @@ void qm(int num_true, UINT32* minterm_true,
     table[i] = (UINT8*)malloc(sizeof(UINT8)*num_true);
     k=0;
     for(j=0;j<num_true;j++){
+      table[i][j] = 0;
       if(k < primearray[i]->arraysize){
         if(j == primearray[i]->array[k]){
           table[i][j] = 1;
           k++;
         }
       }
-      else table[i][j] = 0;
     }
   }
+
+  p = (UINT8*)malloc(sizeof(UINT8)*pnum);
+  for(i=0;i<pnum;i++) p[i] = 0;
   
-  for(i=0;i<pnum;i++){
-    printf("[%3d] ", i);
-    for(j=0;j<num_true;j++)
-      printf("%1d ", table[i][j]);
-    printf("\n");
-  }
+  // 必須項を見つける
+  a = (UINT8*)malloc(sizeof(UINT8)*num_true);
+  for(j=0;j<num_true;j++) a[j] = 0;
   
-  u = (unit**)malloc(sizeof(unit*)*num_true);
-  b = (int)ceil((REAL)pnum / (sizeof(UINT8)*8));
+  cnum = (int*)malloc(sizeof(int)*pnum);
   
   for(j=0;j<num_true;j++){
     num = 0;
-    for(i=0;i<pnum;i++) num += table[i][j];
-    u[j] = (unit*)malloc(sizeof(unit));
-    u[j]->num = num;
-    u[j]->array = (UINT8**)malloc(sizeof(UINT8*)*num);
-    for(i=0;i<u[j]->num;i++){
-      u[j]->array[i] = (UINT8*)malloc(sizeof(UINT8)*b);
-      for(k=0;k<b;k++) u[j]->array[i][k] = 0;
+    for(i=0;i<pnum;i++){
+      if(num == 0 && table[i][j]==1) m = i;
+      num += table[i][j];
+    }
+    if(num == 1){
+      for(k=0;k<num_true;k++) a[k] |= table[m][k];
+      p[m] = 1;
     }
     
-    k = 0;
-    for(i=pnum-1;i>=0;i--){
-      if(table[i][j] == 1){
-        printf("m[%d] %d\n", j, i);
-        unitSet(u[j], k, i);
-        k++;
-      }
+    printf("m[%d] %d", j, num);
+    if(num == 1){
+      printf(" * e[%d]", m);
     }
-  }
-  for(j=0;j<num_true;j++){
-    printf("unum[%d] %d\n", j, u[j]->num);
-  }
-  // tableはもう使わないのでfreeする
-  for(i=0;i<pnum;i++) free(table[i]);
-  free(table);
-  
-  uu = unitClone(u[0], pnum);
-  for(i=1;i<num_true;i++){
-    uu2 = unitMerge(uu, u[i], pnum);
-    for(j=0;j<uu2->num;j++){
-      printf("(%d) ", j);
-      for(k=b-1;k>=0;k--) printf("%1X", uu2->array[j][k]);
-      printf("\n");
-    }
-    
-    for(j=0;j<uu->num;j++) free(uu->array[j]);
-    free(uu->array);
-    free(uu);
-    uu = uu2;
-  }
-  
-  // uはもう使わないのでfreeする
-  printf("Free u\n");
-  for(i=0;i<num_true;i++){
-    for(j=0;j<u[i]->num;j++) free(u[i]->array[j]);
-    free(u[i]->array);
-    free(u[i]);
-  }
-  free(u);
-
-  ua = (unit32**)malloc(sizeof(unit32*)*uu->num);
-  for(i=0;i<uu->num;i++){
-    un = unitBitcount(uu->array[i], pnum);
-    ua[i] = (unit32*)malloc(sizeof(unit32)*uu->num);
-    ua[i]->num = un;
-    ua[i]->array = (UINT32*)malloc(sizeof(UINT32)*ua[i]->num);
-    
-    m=0; idx=0;
-    for(j=0;j<b;j++){
-      tp=uu->array[i][j];
-      for(k=0;k<8;k++){
-        if(tp%2==1){
-          ua[i]->array[idx] = (UINT32)m;
-          idx++;
-        }
-        tp/=2;
-        m++;
-      }
-    }
-  }
-  
-  for(i=0;i<uu->num;i++){
-    printf("[%d](%d) ", i, ua[i]->num);
-    for(j=0;j<ua[i]->num;j++)
-      printf("%d ", ua[i]->array[j]);
     printf("\n");
   }
 
+  m = 0;
+  for(j=0;j<num_true;j++)
+    if(a[j] == 0) m++;
+  printf("Remains Zero:%d\n", m);
+
+  while(m != 0){
+    for(i=0;i<pnum;i++) cnum[i] = 0;
+    for(i=0;i<pnum;i++){
+      if(p[i] == 0){
+        for(j=0;j<num_true;j++)
+          if(a[j] == 0 && table[i][j] == 1) cnum[i]++;
+      }
+    }
+    
+    maxidx = 0; maxnum = 0;
+    for(i=0;i<pnum;i++){
+      if(maxnum < cnum[i]){
+        maxidx = i;
+        maxnum = cnum[i];
+      }
+    }
+    
+    printf("maximum coverage e[%d]: %d bits\n", maxidx, maxnum);
+    for(j=0;j<num_true;j++) a[j] |= table[maxidx][j];
+    p[maxidx] = 1;
+
+    m = 0;
+    for(j=0;j<num_true;j++) if(a[j] == 0) m++;
+    printf("Remains Zero:%d\n", m);
+  }
+
+  m = 0;
+  for(i=0;i<pnum;i++) if(p[i] != 0) m++;
+  printf("%d terms:\n", m);
+
+  for(i=0;i<pnum;i++){
+    if(p[i] != 0){
+      bitExpression(minterm, primearray[i], blength);
+      printf("\n");
+    }
+  }
+
+
+  /*
+  #ifdef DEBUG
   for(i=0;i<uu->num;i++){
-    for(j=0;j<ua[i]->num;j++){
-      bitExpression(minterm, primearray[ua[i]->array[j]], blength);
+    printf("[%d](%d) ", i, ua[i]->num);
+    for(j=0;j<ua[i]->num;j++) printf("%u ", ua[i]->array[j]);
+    printf("\n");
+  }
+  #endif
+
+  printf("Bits: %d\n", uu->num);
+  
+  {
+    int min, min_num;
+    min = 0;
+    min_num = ua[min]->num;
+    for(i=0;i<uu->num;i++){
+      if(ua[i]->num < min_num){
+        min = i;
+        min_num = ua[i]->num;
+      }
+    }
+    printf("[%d](%d) ", min, min_num);
+    for(j=0;j<ua[min]->num;j++){
+      bitExpression(minterm, primearray[ua[min]->array[j]], blength);
       printf(" ");
     }
     printf("\n");
   }
-  
+  */
 }
-
-
 
 int main(int argc, char** argv){
   UINT32 *minterm_true, *minterm_dc;
   int num_true = 6;
   int num_dc   = 2;
-  
+  int i;
+
+  FILE *fp_true, *fp_dc, *fp;
+  char line[256];
+  /*
   minterm_true = (UINT32*)malloc(sizeof(UINT32)*num_true);
   minterm_dc   = (UINT32*)malloc(sizeof(UINT32)*num_dc);
-
+  
   minterm_true[ 0] = 4;
   minterm_true[ 1] = 12;
   minterm_true[ 2] = 15;
@@ -301,10 +321,61 @@ int main(int argc, char** argv){
   minterm_dc[1] = 9;
   
   qm(num_true, minterm_true, num_dc, minterm_dc);
+  */
 
+  if(argc != 3){
+    printf("%s [file_true] [file_dc]\n", argv[0]);
+    exit(EXIT_FAILURE);
+  }
+
+  if((fp_true = fopen(argv[1], "r")) == NULL){
+    printf("file open error.\n");
+    exit(EXIT_FAILURE);
+  }
+  if((fp_dc = fopen(argv[2], "r")) == NULL){
+    printf("file open error.\n");
+    exit(EXIT_FAILURE);
+  }
+  fp = fp_true;
+  num_true = 0;
+  while(fgets(line,sizeof(line),fp) != NULL) num_true++;
+  fp = fp_dc;
+  num_dc = 0;
+  while(fgets(line,sizeof(line),fp) != NULL) num_dc++;
+  fclose(fp_true);
+  fclose(fp_dc);
+
+
+  minterm_true = (UINT32*)malloc(sizeof(UINT32)*num_true);
+  minterm_dc   = (UINT32*)malloc(sizeof(UINT32)*num_dc);
+  
+  if((fp_true = fopen(argv[1], "r")) == NULL){
+    printf("file open error.\n");
+    exit(EXIT_FAILURE);
+  }
+  if((fp_dc = fopen(argv[2], "r")) == NULL){
+    printf("file open error.\n");
+    exit(EXIT_FAILURE);
+  }
+  fp=fp_true; i=0;
+  while(fgets(line,sizeof(line),fp) != NULL){
+    minterm_true[i] = atoi(line);
+    i++;
+  }
+  fp=fp_dc; i=0;
+  while(fgets(line,sizeof(line),fp) != NULL){
+    minterm_dc[i] = atoi(line);
+    i++;
+  }
+  fclose(fp_true);
+  fclose(fp_dc);
+
+  qm(num_true, minterm_true, num_dc, minterm_dc);
+
+  printf("Free\n");
   free(minterm_true);
   free(minterm_dc);
-
+  
   return 0;
 }
 

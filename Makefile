@@ -5,7 +5,7 @@ TARGET = ./main$(EXEEXT)
 #SRCS = ulist.c hamming.c main.c
 SRCS = unit.c unit32.c hamming.c main.c
 CXX = gcc
-CXXFLAGS = -g -Wall # -g
+CXXFLAGS = -O3 -Wall # -g
 
 #OPENCVINC = `pkg-config --cflags opencv`
 #OPENCVLIB = `pkg-config --libs opencv`

@@ -72,23 +72,29 @@ void bitExpression(UINT32* term, hammingData* hd, int blen){
   int i;
   UINT32 d;
   UINT32 m;
-  char c[8];
+  char *c;
   
   d = term[hd->array[0]];
   m = hd->mask;
 
+  c = NULL;
+  c = (char*)malloc(sizeof(char)*(blen));
+  if(c == NULL){
+    printf("memory Allocation Error.\n");
+    exit(EXIT_FAILURE);
+  }
+  
   for(i=0;i<blen;i++){
     if(m % 2) c[i] = 'X';
-    else      c[i] = '0'+d%2;
+    else      c[i] = '0'+(d%2);
     m /= 2;
     d /= 2;
   }
   
-  for(i=blen-1;i>=0;i--){
-    printf("%c", c[i]);
-  }
+  for(i=blen-1;i>=0;i--) printf("%c", c[i]);
 
-
+  free(c);
+  c = NULL;
 }
 
 void hammingMatch(hamming* h, hammingData *a, hammingData *b, UINT32 *term){
@@ -148,7 +154,8 @@ void hammingMatch(hamming* h, hammingData *a, hammingData *b, UINT32 *term){
       p=p->next;
     }
     // 同じものは発見されなかった
-    printf("  Flag: %d\n", flag);
+    if(flag == 0) printf("  Unique: true\n");
+    else          printf("  Unique: false\n");
     if(flag == 0){
       if(h->len == 0) h->tail  = hd;
       else            hd->next = h->head;
